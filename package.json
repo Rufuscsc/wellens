@@ -23,6 +23,12 @@
     "protocols": {
       "name": "wellens-app",
       "schemes": ["wellens-app"]
+    },
+    "fileAssociations": {
+      "ext": "wellens",
+      "name": "Wellens Secure Book",
+      "description": "Encrypted book package for Wellens",
+      "role": "Viewer"
     }
   },
   "author": "Rufuscsc",

@@ -119,8 +119,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .modal-sub{font-size:.8rem;color:var(--text-muted);margin-bottom:22px;}
 .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
 .form-label{font-size:.78rem;color:var(--text-muted);font-weight:500;}
-.form-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.875rem;outline:none;transition:border-color .15s;}
+.input-wrap{position:relative;}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.875rem;outline:none;transition:border-color .15s;}
 .form-input:focus{border-color:var(--accent-dim);}
+.toggle-pw{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-sub);padding:4px;}
+.toggle-pw:hover{color:var(--text-muted);}
+.toggle-pw svg{width:15px;height:15px;}
 .form-input::placeholder{color:var(--text-sub);}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;}
 .link-result{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:monospace;font-size:.78rem;color:var(--accent);word-break:break-all;margin-bottom:10px;}
@@ -189,6 +193,10 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search…" id="searchInput" oninput="filterBooks()">
         </div>
+        <button class="btn btn-outline" style="border-color:var(--border)" onclick="importShareFile()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Import .wellens
+        </button>
         <button class="btn btn-primary" onclick="uploadBook()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Upload Book
@@ -203,10 +211,16 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   <div class="page" id="page-shares">
     <div class="section-head">
       <h2 class="section-title">Shared Links</h2>
-      <button class="btn btn-ghost btn-sm" onclick="loadShares()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        Refresh
-      </button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline btn-sm" onclick="importShareFile()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Import File
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="loadShares()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+      </div>
     </div>
     <ul id="shareList" style="display:flex;flex-direction:column;gap:10px;list-style:none;"></ul>
   </div>
@@ -222,7 +236,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     <div id="shareForm">
       <div class="form-group">
         <label class="form-label">Password (required)</label>
-        <input class="form-input" type="password" id="sharePassword" placeholder="Enter a strong password…">
+        <div class="input-wrap">
+          <input class="form-input" type="password" id="sharePassword" placeholder="Enter a strong password…">
+          <button class="toggle-pw" onclick="toggleSharePw()" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Expiry Date & Time (optional)</label>
@@ -230,10 +249,14 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       </div>
     </div>
 
-    <div id="shareResult" style="display:none">
-      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px;">Share this link with the recipient. They will need the password you set.</p>
-      <div class="link-result" id="shareLink"></div>
-      <p class="copy-hint">Click the link to copy it to clipboard.</p>
+    <div id="shareResult" style="display:none;text-align:center;">
+      <div style="color:var(--green);margin-bottom:12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:36px;height:36px;margin:0 auto 10px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem">Export Successful</h3>
+      </div>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">Send the generated <b>.wellens</b> file to your recipient.<br><br>If they don't have the desktop app installed, they can download it from the link below:</p>
+      <div class="link-result" id="shareLink" style="cursor:pointer;" onclick="copyLink()"></div>
+      <p class="copy-hint" style="text-transform:uppercase;font-size:.65rem;font-weight:700;letter-spacing:1px;cursor:pointer;opacity:0.8" onclick="copyLink()">Click Link to Copy</p>
     </div>
 
     <div class="modal-footer">
@@ -250,6 +273,11 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="toast" id="toast"></div>
 
 <script>
+function toggleSharePw() {
+  const inp = document.getElementById('sharePassword');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
 let allBooks = [];
 let shareTargetId = null;
 
@@ -375,19 +403,36 @@ async function submitShare() {
   const expiresAt = expiryVal ? new Date(expiryVal).getTime() : null;
   const res = await window.wellens.createShare({ bookId: shareTargetId, password, expiresAt });
 
-  if (!res.success) { showToast(res.error || 'Error creating share', true); return; }
+  if (!res.success) { 
+    if (!res.canceled) showToast(res.error || 'Error exporting share', true); 
+    return; 
+  }
+  if (!res.saved) {
+    showToast('Export canceled.');
+    return;
+  }
 
   document.getElementById('shareForm').style.display = 'none';
   document.getElementById('shareSubmitBtn').style.display = 'none';
   document.getElementById('shareResult').style.display = '';
   document.getElementById('shareLink').textContent = res.link;
-  document.getElementById('shareLink').onclick = () => {
+  window.copyLink = () => {
     navigator.clipboard.writeText(res.link);
-    showToast('Link copied to clipboard!');
+    showToast('Download Link copied to clipboard!');
   };
-  document.getElementById('shareLink').style.cursor = 'pointer';
 
   await updateStats();
+}
+
+async function importShareFile() {
+  const res = await window.wellens.importShare();
+  if (res.success) {
+    showToast('Share imported successfully!');
+    loadShares();
+    updateStats();
+  } else if (!res.canceled) {
+    showToast(res.error || 'Failed to import. File may be corrupted.', true);
+  }
 }
 
 // ── Shares Page ──

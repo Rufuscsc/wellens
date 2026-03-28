@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('wellens', {
 
   // Shares
   createShare:  (opts)       => ipcRenderer.invoke('share:create', opts),
+  importShare:  ()           => ipcRenderer.invoke('share:import'),
   getShares:    ()           => ipcRenderer.invoke('share:getAll'),
   deleteShare:  (id)         => ipcRenderer.invoke('share:delete', id),
   unlockShare:  (opts)       => ipcRenderer.invoke('share:unlock', opts),
