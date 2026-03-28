@@ -31,7 +31,7 @@
       <p>It looks like you don't have the <strong>Wellens</strong> secure reader application installed on this device. You need it to open and read encrypted shared books.</p>
       
       <!-- We point directly to a Github Releases installer for the target repo! -->
-      <a href="https://github.com/Rufuscsc/wellens/releases/latest/download/Wellens.Setup.1.0.0.exe" class="btn">Download Wellens for Windows</a>
+      <a href="https://github.com/Rufuscsc/wellens/releases/latest/" class="btn" target="_blank">Download Wellens for Windows</a>
       
       <p style="margin-top:20px; font-size: 0.85em; color: #4a4538">Once installed, simply click your share link again!</p>
     </div>
@@ -43,7 +43,12 @@
 
     if (!id) {
       document.getElementById('loader').style.display = 'none';
-      document.getElementById('fallback').innerHTML = "<h1>Invalid Link</h1><p>This share link is missing its secure ID.</p>";
+      document.getElementById('fallback').innerHTML = `
+        <h1>Download Wellens</h1>
+        <p>A friend has sent you a secure <strong>.wellens</strong> book file. You must install the free Wellens secure reader application to open and read it.</p>
+        <a href="https://github.com/Rufuscsc/wellens/releases/latest/" class="btn" target="_blank">Download Installer from GitHub</a>
+        <p style="margin-top:20px; font-size: 0.85em; color: #4a4538">Once installed, simply double-click the .wellens file they sent you!</p>
+      `;
       document.getElementById('fallback').style.display = 'block';
     } else {
       // 1. Try launching the OS-native deep link to pop open the desktop app
