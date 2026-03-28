@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening Book — Wellens</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0f0e0c;color:#f0ead8;font-family:'DM Sans',sans-serif;height:100vh;display:flex;align-items:center;justify-content:center;}
+    .card { background: #1a1815; border: 1px solid #2e2b26; border-radius: 18px; padding: 40px; width: 440px; max-width: 90vw; text-align: center; }
+    h1 { font-family: 'Playfair Display', serif; margin-bottom: 12px; color: #c9a84c; }
+    p { color: #7a7260; margin-bottom: 24px; line-height: 1.5; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; background: #c9a84c; color: #0f0e0c; padding: 12px 24px; border-radius: 12px; font-weight: 500; text-decoration: none; transition: 0.2s; }
+    .btn:hover { background: #d9b85c; }
+    #fallback { display: none; }
+    .spinner { display: inline-block; width: 40px; height: 40px; border: 3px solid #2e2b26; border-top-color: #c9a84c; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;}
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="loader">
+      <div class="spinner"></div>
+      <h1>Opening Wellens...</h1>
+      <p>Attempting to securely launch your book application. Please permit your browser to open links if prompted.</p>
+    </div>
+
+    <div id="fallback">
+      <h1>App Not Found</h1>
+      <p>It looks like you don't have the <strong>Wellens</strong> secure reader application installed on this device. You need it to open and read encrypted shared books.</p>
+      
+      <!-- We point directly to a Github Releases installer for the target repo! -->
+      <a href="https://github.com/Rufuscsc/wellens/releases/latest/download/Wellens.Setup.1.0.0.exe" class="btn">Download Wellens for Windows</a>
+      
+      <p style="margin-top:20px; font-size: 0.85em; color: #4a4538">Once installed, simply click your share link again!</p>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+
+    if (!id) {
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('fallback').innerHTML = "<h1>Invalid Link</h1><p>This share link is missing its secure ID.</p>";
+      document.getElementById('fallback').style.display = 'block';
+    } else {
+      // 1. Try launching the OS-native deep link to pop open the desktop app
+      window.location.replace('wellens-app://open/' + id);
+
+      // 2. If after 2.5s the user is STILL on this page (meaning the app didn't capture the deep link),
+      // we gracefully reveal the Download button UI instead of an infinite spinner.
+      setTimeout(() => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('fallback').style.display = 'block';
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

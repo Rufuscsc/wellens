@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reader — Wellens</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- PDF.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#161412;--surface:#1e1c18;--surface2:#252119;--border:#2e2b26;--accent:#c9a84c;--text:#f0ead8;--text-muted:#7a7260;--radius:10px;}
+
+/* DRM: block screenshots/selection */
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  height:100vh;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  user-select:none;
+  -webkit-user-select:none;
+  overflow:hidden;
+}
+
+/* Prevent text selection on canvas */
+canvas { user-select:none; -webkit-user-select:none; pointer-events:none; }
+
+/* Watermark overlay — always on top, transparent to clicks */
+.watermark{
+  position:fixed;inset:0;z-index:900;pointer-events:none;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 120px,
+    rgba(201,168,76,0.04) 120px,
+    rgba(201,168,76,0.04) 121px
+  );
+  display:flex;align-items:center;justify-content:center;
+}
+.watermark::after{
+  content:'WELLENS — PROTECTED';
+  position:absolute;
+  font-family:'Playfair Display',serif;
+  font-size:11px;
+  letter-spacing:.2em;
+  color:rgba(201,168,76,0.07);
+  transform:rotate(-35deg);
+  white-space:nowrap;
+  font-size:16px;
+}
+
+/* TITLEBAR */
+.titlebar{-webkit-app-region:drag;display:flex;align-items:center;justify-content:space-between;padding:0 18px;height:46px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);z-index:50;}
+.titlebar-left{display:flex;align-items:center;gap:10px;-webkit-app-region:no-drag;}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:grid;place-items:center;}
+.logo-icon svg{width:14px;height:14px;color:#0f0e0c;}
+.book-name{font-family:'Playfair Display',serif;font-size:.9rem;color:var(--text-muted);}
+.titlebar-right{display:flex;align-items:center;gap:10px;-webkit-app-region:no-drag;}
+
+/* COUNTDOWN */
+.countdown{display:flex;align-items:center;gap:8px;background:rgba(192,68,42,.12);border:1px solid rgba(192,68,42,.3);border-radius:8px;padding:5px 12px;}
+.countdown.warning{background:rgba(192,68,42,.25);border-color:#c0442a;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.countdown-icon{color:#d0654a;}
+.countdown-icon svg{width:13px;height:13px;}
+.countdown-text{font-size:.75rem;color:#d0654a;font-weight:500;font-variant-numeric:tabular-nums;}
+
+/* WIN CONTROLS */
+.win-btn{width:26px;height:26px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;display:grid;place-items:center;cursor:pointer;transition:all .15s;}
+.win-btn:hover{background:var(--border);}
+.win-btn.close:hover{background:var(--danger,#c0442a);}
+.win-btn svg{width:11px;height:11px;color:var(--text-muted);}
+.win-controls{display:flex;gap:5px;}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:10px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap;}
+.toolbar-group{display:flex;align-items:center;gap:6px;}
+.divider{width:1px;height:20px;background:var(--border);}
+.tool-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;transition:all .15s;}
+.tool-btn:hover{background:var(--border);color:var(--text);}
+.tool-btn:disabled{opacity:.4;cursor:not-allowed;}
+.tool-btn svg{width:13px;height:13px;}
+.page-info{font-size:.78rem;color:var(--text-muted);padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-variant-numeric:tabular-nums;min-width:80px;text-align:center;}
+.zoom-val{min-width:50px;text-align:center;}
+
+/* CONTENT */
+.reader-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;justify-content:center;background:var(--bg);padding:24px 0;}
+.reader-body::-webkit-scrollbar{width:6px;}
+.reader-body::-webkit-scrollbar-track{background:transparent;}
+.reader-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+#pdfContainer{display:flex;flex-direction:column;gap:16px;align-items:center;padding-bottom:40px;}
+.page-wrapper{position:relative;box-shadow:0 4px 32px rgba(0,0,0,.6);border-radius:4px;overflow:hidden;max-width:100%;box-sizing:border-box;}
+.page-wrapper canvas{display:block;max-width:100%;height:auto;}
+
+/* LOADING */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:800;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:.85rem;color:var(--text-muted);}
+
+/* EXPIRED */
+.expired-screen{position:fixed;inset:0;background:rgba(15,14,12,.97);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:999;text-align:center;}
+.expired-icon{width:64px;height:64px;background:rgba(192,68,42,.15);border:1px solid rgba(192,68,42,.3);border-radius:16px;display:grid;place-items:center;}
+.expired-icon svg{width:30px;height:30px;color:#d0654a;}
+.expired-title{font-family:'Playfair Display',serif;font-size:1.4rem;}
+.expired-sub{font-size:.85rem;color:var(--text-muted);max-width:320px;}
+</style>
+</head>
+<body>
+
+<!-- WATERMARK (always on top) -->
+<div class="watermark"></div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+  <p class="loading-text">Decrypting & loading book…</p>
+</div>
+
+<!-- EXPIRED -->
+<div class="expired-screen" id="expiredScreen">
+  <div class="expired-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+  </div>
+  <h2 class="expired-title">Access Expired</h2>
+  <p class="expired-sub">This shared book link has expired. Please contact the sender to request a new link.</p>
+</div>
+
+<!-- TITLEBAR -->
+<div class="titlebar">
+  <div class="titlebar-left">
+    <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+    <span class="book-name" id="bookName">Loading…</span>
+  </div>
+  <div class="titlebar-right">
+    <div class="countdown" id="countdown" style="display:none">
+      <span class="countdown-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+      <span class="countdown-text" id="countdownText">--:--:--</span>
+    </div>
+    <div class="win-controls">
+      <div class="win-btn" onclick="window.reader.minimize()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      <div class="win-btn" onclick="window.reader.maximize()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></div>
+      <div class="win-btn close" onclick="window.reader.close()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-group">
+    <button class="tool-btn" id="prevBtn" onclick="prevPage()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>Prev
+    </button>
+    <span class="page-info" id="pageInfo">— / —</span>
+    <button class="tool-btn" id="nextBtn" onclick="nextPage()">
+      Next<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
+  <div class="divider"></div>
+  <div class="toolbar-group">
+    <button class="tool-btn" onclick="zoomOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+    <span class="tool-btn zoom-val" id="zoomVal">100%</span>
+    <button class="tool-btn" onclick="zoomIn()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+    <button class="tool-btn" onclick="fitWidth()">Fit</button>
+  </div>
+  <div class="divider"></div>
+  <div class="toolbar-group" style="margin-left:auto;">
+    <span style="font-size:.72rem;color:var(--text-sub);display:flex;align-items:center;gap:5px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Protected · Read-only
+    </span>
+  </div>
+</div>
+
+<!-- PDF CONTENT -->
+<div class="reader-body" id="readerBody">
+  <div id="pdfContainer"></div>
+</div>
+
+<script>
+// ── PDF.js setup ──
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── DRM: Intercept ALL keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  // Block: Ctrl+S, Ctrl+P, Ctrl+C, Ctrl+A, PrintScreen, F12, Ctrl+Shift+I
+  const blocked = [
+    e.ctrlKey && ['s','p','c','a','u'].includes(e.key.toLowerCase()),
+    e.key === 'PrintScreen',
+    e.key === 'F12',
+    e.ctrlKey && e.shiftKey && ['i','j','c'].includes(e.key.toLowerCase()),
+    e.metaKey && ['s','p','c','a'].includes(e.key.toLowerCase()),
+  ];
+  if (blocked.some(Boolean)) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
+// Block right-click
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Block drag
+document.addEventListener('dragstart', e => e.preventDefault());
+
+// ── State ──
+const params = window.reader.getParams();
+const { shareId, expiresAt } = params;
+let pdfDoc = null;
+let currentPage = 1;
+let totalPages = 0;
+let scale = null;
+let countdownInterval = null;
+let expired = false;
+
+// ── Init ──
+async function init() {
+  const res = await window.reader.getPDF(shareId);
+
+  if (!res || !res.success) {
+    if (res && res.error === 'expired') {
+      showExpired();
+    } else {
+      document.getElementById('loadingScreen').innerHTML = `<p style="color:#d0654a">Error: ${res?.error || 'Could not load book'}</p>`;
+    }
+    return;
+  }
+
+  // Decode base64 → Uint8Array (never touches disk)
+  const binaryStr = atob(res.data);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+  const actualExpiry = res.expiresAt || (expiresAt && expiresAt !== 'null' ? Number(expiresAt) : null);
+
+  pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  totalPages = pdfDoc.numPages;
+
+  // Guess title from URL params or share
+  document.getElementById('bookName').textContent = 'Shared Book';
+
+  // Initial responsive scale fit
+  const page = await pdfDoc.getPage(1);
+  const vp = page.getViewport({ scale: 1 });
+  const body = document.getElementById('readerBody');
+  scale = Math.min((body.clientWidth - 60) / vp.width, 2.5);
+
+  document.getElementById('loadingScreen').style.display = 'none';
+  await renderPage(1);
+
+  if (actualExpiry) startCountdown(actualExpiry);
+}
+
+// ── Render ──
+async function renderPage(num) {
+  currentPage = num;
+  const container = document.getElementById('pdfContainer');
+
+  // Render all pages if not already rendered
+  if (container.children.length === 0) {
+    for (let i = 1; i <= totalPages; i++) {
+      await renderSinglePage(i, container);
+    }
+  }
+
+  // Scroll to the target page
+  const pageEl = document.getElementById(`pdf-page-${num}`);
+  if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  updateUI();
+}
+
+async function renderSinglePage(num, container) {
+  const page = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale });
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+  wrapper.id = `pdf-page-${num}`;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  // DRM: disable pointer events so text cannot be selected/copied
+  canvas.style.pointerEvents = 'none';
+
+  wrapper.appendChild(canvas);
+  container.appendChild(wrapper);
+
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Optional: add subtle watermark text on each page
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = `${Math.floor(viewport.width / 20)}px 'Playfair Display', serif`;
+  ctx.translate(viewport.width / 2, viewport.height / 2);
+  ctx.rotate(-Math.PI / 6);
+  ctx.textAlign = 'center';
+  ctx.fillText('WELLENS', 0, 0);
+  ctx.restore();
+}
+
+function updateUI() {
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+}
+
+function prevPage() { if (currentPage > 1) scrollToPage(currentPage - 1); }
+function nextPage() { if (currentPage < totalPages) scrollToPage(currentPage + 1); }
+
+function scrollToPage(num) {
+  currentPage = num;
+  const el = document.getElementById(`pdf-page-${num}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  updateUI();
+}
+
+// Detect current page from scroll position
+document.getElementById('readerBody').addEventListener('scroll', () => {
+  for (let i = 1; i <= totalPages; i++) {
+    const el = document.getElementById(`pdf-page-${i}`);
+    if (!el) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+      currentPage = i;
+      updateUI();
+      break;
+    }
+  }
+});
+
+// ── Zoom ──
+async function zoomIn() { scale = Math.min(scale + 0.2, 3); await rerender(); }
+async function zoomOut() { scale = Math.max(scale - 0.2, 0.5); await rerender(); }
+async function fitWidth() {
+  const body = document.getElementById('readerBody');
+  if (pdfDoc) {
+    const page = await pdfDoc.getPage(1);
+    const vp = page.getViewport({ scale: 1 });
+    scale = (body.clientWidth - 60) / vp.width;
+    await rerender();
+  }
+}
+
+async function rerender() {
+  document.getElementById('zoomVal').textContent = Math.round(scale * 100) + '%';
+  const container = document.getElementById('pdfContainer');
+  container.innerHTML = '';
+  for (let i = 1; i <= totalPages; i++) await renderSinglePage(i, container);
+  scrollToPage(currentPage);
+}
+
+// ── Countdown ──
+function startCountdown(expiresAt) {
+  const el = document.getElementById('countdown');
+  const txt = document.getElementById('countdownText');
+  el.style.display = 'flex';
+
+  function tick() {
+    if (expired) return;
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) {
+      showExpired();
+      return;
+    }
+
+    // Warning: last 5 minutes
+    if (remaining < 5 * 60 * 1000) el.classList.add('warning');
+
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    txt.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+
+  tick();
+  countdownInterval = setInterval(tick, 1000);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+async function showExpired() {
+  if (expired) return;
+  expired = true;
+  clearInterval(countdownInterval);
+
+  await window.reader.expired(shareId);
+
+  document.getElementById('expiredScreen').style.display = 'flex';
+
+  // Auto-close after 5 seconds
+  setTimeout(() => window.reader.close(), 5000);
+}
+
+// ── Responsive Resize ──
+// CSS max-width: 100% properties handle visual shrinking natively, removing the need to
+// computationally bottleneck the app wiping and rerendering hundreds of canvases sequentially.
+
+// ── Start ──
+init();
+</script>
+</body>
+</html>

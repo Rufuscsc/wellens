@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Librarium – Secure Viewer</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://127.0.0.1:* https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <!-- Block print -->
+  <style media="print">* { display:none !important; }</style>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:#0f0e0c; --surface:#1a1815; --surface2:#221f1b; --border:#2e2b26;
+      --accent:#c9a84c; --accent-dim:#8a6f2e; --text:#f0ead8;
+      --text-muted:#7a7260; --text-sub:#4a4538; --danger:#c0442a; --radius:12px;
+    }
+
+    html, body { height:100%; }
+    body {
+      background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif;
+      /* Anti-screenshot: partial — watermark overlay is always on top */
+      user-select:none; -webkit-user-select:none;
+    }
+
+    /* ─── SCREENS ─────────────────────────────────── */
+    .screen { display:none; min-height:100vh; }
+    .screen.active { display:flex; }
+
+    /* ─── PASSWORD GATE ── */
+    #gateScreen {
+      align-items:center; justify-content:center; flex-direction:column; gap:0;
+      background:radial-gradient(ellipse at 50% 30%, #1e1b16 0%, var(--bg) 70%);
+    }
+
+    .gate-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:20px;
+      padding:40px; width:380px; max-width:92vw; text-align:center;
+    }
+
+    .gate-logo { width:52px; height:52px; background:var(--accent); border-radius:12px; display:grid; place-items:center; margin:0 auto 20px; }
+    .gate-logo svg { width:26px; height:26px; color:#0f0e0c; }
+    .gate-title { font-family:'Playfair Display',serif; font-size:1.3rem; margin-bottom:6px; }
+    .gate-sub { font-size:0.82rem; color:var(--text-muted); margin-bottom:28px; line-height:1.5; }
+
+    .form-group { margin-bottom:16px; text-align:left; }
+    label { display:block; font-size:0.78rem; color:var(--text-muted); margin-bottom:6px; }
+    input[type=password] {
+      width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+      padding:11px 14px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.9rem; outline:none; transition:border-color .18s;
+    }
+    input[type=password]:focus { border-color:var(--accent-dim); }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:11px 22px; border:none; border-radius:var(--radius); font-family:'DM Sans',sans-serif; font-size:0.875rem; font-weight:500; cursor:pointer; transition:all .18s; width:100%; margin-top:6px; }
+    .btn-primary { background:var(--accent); color:#0f0e0c; }
+    .btn-primary:hover { background:#d9b85c; }
+    .btn-primary:disabled { opacity:.5; cursor:default; }
+
+    .error-msg { color:#d0654a; font-size:0.8rem; margin-top:10px; min-height:18px; text-align:center; }
+
+    /* ─── EXPIRED SCREEN ── */
+    #expiredScreen { align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; }
+    #expiredScreen h2 { font-family:'Playfair Display',serif; font-size:1.4rem; }
+    #expiredScreen p { font-size:0.875rem; color:var(--text-muted); max-width:300px; }
+
+    /* ─── READER SCREEN ── */
+    #readerScreen { flex-direction:column; }
+
+    /* Top bar */
+    .reader-topbar {
+      display:flex; align-items:center; gap:14px; padding:12px 24px;
+      background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; z-index:10;
+    }
+    .reader-logo { width:28px; height:28px; background:var(--accent); border-radius:6px; display:grid; place-items:center; flex-shrink:0; }
+    .reader-logo svg { width:15px; height:15px; color:#0f0e0c; }
+    .reader-bookname { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* Countdown */
+    .countdown {
+      display:flex; align-items:center; gap:8px; background:rgba(192,68,42,.12);
+      border:1px solid rgba(192,68,42,.3); border-radius:8px; padding:6px 14px;
+      font-size:0.8rem; color:#d0654a; flex-shrink:0;
+    }
+    .countdown svg { width:14px; height:14px; }
+    #countdownDisplay { font-variant-numeric:tabular-nums; font-weight:600; }
+
+    /* Page controls */
+    .reader-controls {
+      display:flex; align-items:center; gap:10px; padding:10px 24px;
+      background:var(--surface2); border-bottom:1px solid var(--border); flex-shrink:0;
+    }
+    .ctrl-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border:1px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:0.8rem; color:var(--text-muted); cursor:pointer; background:var(--surface); transition:all .15s; }
+    .ctrl-btn:hover { border-color:var(--accent-dim); color:var(--text); }
+    .ctrl-btn svg { width:13px; height:13px; }
+    .page-info { font-size:0.82rem; color:var(--text-muted); min-width:80px; text-align:center; }
+    select.zoom { background:var(--surface); border:1px solid var(--border); color:var(--text-muted); border-radius:7px; padding:6px 10px; font-family:'DM Sans',sans-serif; font-size:0.8rem; outline:none; }
+
+    /* Canvas area */
+    .canvas-wrap {
+      flex:1; overflow:auto; background:#1c1a17; display:flex; justify-content:center;
+      align-items:flex-start; padding:24px; position:relative;
+    }
+
+    #pdfCanvas { display:block; box-shadow:0 8px 40px rgba(0,0,0,.6); }
+
+    /* ── WATERMARK OVERLAY ── prevents clean screenshots */
+    .wm-overlay {
+      position:fixed; inset:0; pointer-events:none; z-index:500;
+      background:repeating-linear-gradient(
+        -45deg,
+        transparent 0px, transparent 80px,
+        rgba(201,168,76,0.06) 80px, rgba(201,168,76,0.06) 82px
+      );
+    }
+
+    /* Full-screen block overlay: shown on visibility change (alt-tab/screen-record) */
+    #privacyGuard {
+      display:none; position:fixed; inset:0; background:var(--bg); z-index:999;
+      align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center;
+    }
+    #privacyGuard.active { display:flex; }
+    #privacyGuard svg { width:48px; height:48px; color:var(--accent); }
+    #privacyGuard h3 { font-family:'Playfair Display',serif; font-size:1.1rem; }
+    #privacyGuard p  { font-size:0.82rem; color:var(--text-muted); max-width:260px; }
+
+    .loading { display:flex; align-items:center; justify-content:center; min-height:200px; color:var(--text-muted); font-size:0.875rem; flex-direction:column; gap:12px; }
+    .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+  </style>
+</head>
+<body>
+
+<!-- ── PASSWORD GATE ── -->
+<div class="screen active" id="gateScreen">
+  <div class="gate-card">
+    <div class="gate-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <h2 class="gate-title">Protected Book</h2>
+    <p class="gate-sub">This book is shared via Librarium and requires a password to access.</p>
+    <div class="form-group">
+      <label>Enter Password</label>
+      <input type="password" id="pwInput" placeholder="Password…" onkeydown="if(event.key==='Enter')unlock()">
+    </div>
+    <button class="btn btn-primary" id="unlockBtn" onclick="unlock()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      Open Book
+    </button>
+    <div class="error-msg" id="gateError"></div>
+  </div>
+</div>
+
+<!-- ── EXPIRED ── -->
+<div class="screen" id="expiredScreen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" style="width:56px;height:56px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  <h2>This link has expired</h2>
+  <p>The share link you followed is no longer valid. Please ask the sender for a new link.</p>
+</div>
+
+<!-- ── READER ── -->
+<div class="screen" id="readerScreen">
+
+  <!-- Privacy guard (blocks screen when app is not in focus) -->
+  <div id="privacyGuard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <h3>Content Hidden</h3>
+    <p>Return to this window to continue reading.</p>
+  </div>
+
+  <!-- Watermark diagonal lines always on top -->
+  <div class="wm-overlay"></div>
+
+  <!-- Top bar -->
+  <div class="reader-topbar">
+    <div class="reader-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    </div>
+    <span class="reader-bookname" id="bookName">Loading…</span>
+    <div class="countdown">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Expires in <strong id="countdownDisplay">--:--:--</strong>
+    </div>
+  </div>
+
+  <!-- Page controls -->
+  <div class="reader-controls">
+    <button class="ctrl-btn" onclick="prevPage()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Prev
+    </button>
+    <span class="page-info" id="pageInfo">— / —</span>
+    <button class="ctrl-btn" onclick="nextPage()">
+      Next
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <select class="zoom" onchange="changeZoom(this.value)">
+      <option value="0.7">70%</option>
+      <option value="1" selected>100%</option>
+      <option value="1.3">130%</option>
+      <option value="1.6">160%</option>
+      <option value="2">200%</option>
+    </select>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <div class="loading" id="loadingMsg">
+      <div class="spinner"></div>
+      Loading secure content…
+    </div>
+    <canvas id="pdfCanvas" style="display:none"></canvas>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+
+// ── Extract token from URL ──────────────────────────────────────────────
+const TOKEN = location.pathname.split('/').filter(Boolean)[1];
+const BASE  = location.origin;
+
+let sessionToken = null;
+let expiresAt    = null;
+let pdfDoc       = null;
+let currentPage  = 1;
+let zoom         = 1;
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Anti-capture: block right-click, drag, text selection ─────────────
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dragstart',   e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  // Block Ctrl/Cmd + C, P, S, A, U, Shift+I (devtools)
+  if ((e.ctrlKey || e.metaKey) && ['c','p','s','a','u'].includes(e.key.toLowerCase())) { e.preventDefault(); return false; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return false; }
+  if (e.key === 'PrintScreen') { e.preventDefault(); blackout(); return false; }
+  if (e.key === 'F12') { e.preventDefault(); return false; }
+});
+
+// Privacy guard on focus loss
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) showPrivacyGuard(true);
+  else showPrivacyGuard(false);
+});
+
+window.addEventListener('blur', () => showPrivacyGuard(true));
+window.addEventListener('focus', () => showPrivacyGuard(false));
+
+function showPrivacyGuard(show) {
+  document.getElementById('privacyGuard').classList.toggle('active', show);
+}
+
+function blackout() {
+  const c = document.getElementById('pdfCanvas');
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#0f0e0c';
+  ctx.fillRect(0, 0, c.width, c.height);
+  setTimeout(() => renderPage(currentPage), 800);
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Unlock ─────────────────────────────────────────────────────────────
+async function unlock() {
+  const pw = document.getElementById('pwInput').value;
+  if (!pw) return;
+  const btn = document.getElementById('unlockBtn');
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+  document.getElementById('gateError').textContent = '';
+
+  try {
+    const res = await fetch(`${BASE}/share/${TOKEN}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      document.getElementById('gateError').textContent = data.error || 'Wrong password.';
+      btn.disabled = false;
+      btn.textContent = 'Open Book';
+      return;
+    }
+
+    if (res.status === 410) { showScreen('expiredScreen'); return; }
+
+    sessionToken = data.sessionToken;
+    expiresAt    = data.expiresAt;
+    document.getElementById('bookName').textContent = data.title || 'Shared Book';
+
+    showScreen('readerScreen');
+    startCountdown();
+    loadPDF();
+  } catch(e) {
+    document.getElementById('gateError').textContent = 'Connection error. Is Librarium running?';
+    btn.disabled = false;
+    btn.textContent = 'Open Book';
+  }
+}
+
+// ── Countdown ──────────────────────────────────────────────────────────
+let countdownInterval;
+function startCountdown() {
+  update();
+  countdownInterval = setInterval(update, 1000);
+
+  function update() {
+    const rem = expiresAt - Date.now();
+    if (rem <= 0) {
+      clearInterval(countdownInterval);
+      document.getElementById('countdownDisplay').textContent = '00:00:00';
+      // Expire: black canvas then block
+      if (pdfDoc) {
+        const c = document.getElementById('pdfCanvas');
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#0f0e0c';
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
+      showScreen('expiredScreen');
+      return;
+    }
+    const h = Math.floor(rem / 3600000);
+    const m = Math.floor((rem % 3600000) / 60000);
+    const s = Math.floor((rem % 60000) / 1000);
+    document.getElementById('countdownDisplay').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+}
+
+// ── Load PDF ───────────────────────────────────────────────────────────
+async function loadPDF() {
+  const pdfUrl = `${BASE}/share/${TOKEN}/pdf?session=${sessionToken}`;
+  try {
+    const res = await fetch(pdfUrl);
+    if (!res.ok) { showScreen('expiredScreen'); return; }
+    const buffer = await res.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('pdfCanvas').style.display  = 'block';
+    renderPage(1);
+  } catch(e) {
+    document.getElementById('loadingMsg').innerHTML = '<p style="color:var(--danger)">Failed to load PDF.</p>';
+  }
+}
+
+async function renderPage(pageNum) {
+  currentPage = pageNum;
+  const page = await pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: zoom });
+  const canvas = document.getElementById('pdfCanvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Paint a subtle repeating watermark TEXT on the canvas itself
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  ctx.fillStyle   = '#c9a84c';
+  ctx.font        = `${Math.round(viewport.width * 0.04)}px sans-serif`;
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(-Math.PI / 6);
+  for (let row = -5; row < 6; row++) {
+    for (let col = -4; col < 5; col++) {
+      ctx.fillText('LIBRARIUM', col * 280 - 80, row * 160);
+    }
+  }
+  ctx.restore();
+
+  document.getElementById('pageInfo').textContent = `${pageNum} / ${pdfDoc.numPages}`;
+}
+
+function prevPage() { if (pdfDoc && currentPage > 1) renderPage(currentPage - 1); }
+function nextPage() { if (pdfDoc && currentPage < pdfDoc.numPages) renderPage(currentPage + 1); }
+function changeZoom(v) { zoom = parseFloat(v); if (pdfDoc) renderPage(currentPage); }
+</script>
+</body>
+</html>

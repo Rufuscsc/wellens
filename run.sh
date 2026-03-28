@@ -1,0 +1,27 @@
+#!/bin/bash
+# Librarium — Setup & Run Script
+set -e
+
+echo ""
+echo "  ██╗     ██╗██████╗ ██████╗  █████╗ ██████╗ ██╗██╗   ██╗███╗   ███╗"
+echo "  ██║     ██║██╔══██╗██╔══██╗██╔══██╗██╔══██╗██║██║   ██║████╗ ████║"
+echo "  ██║     ██║██████╔╝██████╔╝███████║██████╔╝██║██║   ██║██╔████╔██║"
+echo "  ██║     ██║██╔══██╗██╔══██╗██╔══██║██╔══██╗██║██║   ██║██║╚██╔╝██║"
+echo "  ███████╗██║██████╔╝██║  ██║██║  ██║██║  ██║██║╚██████╔╝██║ ╚═╝ ██║"
+echo "  ╚══════╝╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝ ╚═════╝ ╚═╝     ╚═╝"
+echo ""
+echo "  Secure Book Library"
+echo ""
+
+# Check node
+if ! command -v node &>/dev/null; then
+  echo "❌  Node.js is required. Download from https://nodejs.org"
+  exit 1
+fi
+
+echo "📦  Installing dependencies..."
+npm install
+
+echo ""
+echo "🚀  Starting Librarium..."
+npm start

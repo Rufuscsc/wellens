@@ -1,0 +1,38 @@
+{
+  "name": "wellens",
+  "version": "1.0.0",
+  "description": "Secure Book Library — Electron App",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect",
+    "build": "electron-builder build --win"
+  },
+  "build": {
+    "appId": "com.rufuscsc.wellens",
+    "productName": "Wellens",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "protocols": {
+      "name": "wellens-app",
+      "schemes": ["wellens-app"]
+    }
+  },
+  "author": "Rufuscsc",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.0"
+  }
+}

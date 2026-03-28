@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wellens</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0e0c;--surface:#1a1815;--surface2:#221f1b;--border:#2e2b26;
+  --accent:#c9a84c;--accent-dim:#8a6f2e;--text:#f0ead8;--text-muted:#7a7260;
+  --text-sub:#4a4538;--danger:#c0442a;--green:#4a8c5c;--radius:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;-webkit-app-region:no-drag;user-select:none;}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+/* TITLEBAR */
+.titlebar{-webkit-app-region:drag;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:48px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;background:var(--bg);backdrop-filter:blur(12px);}
+.titlebar-left{display:flex;align-items:center;gap:12px;-webkit-app-region:no-drag;}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:grid;place-items:center;}
+.logo-icon svg{width:17px;height:17px;color:#0f0e0c;}
+.app-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;}
+.win-controls{display:flex;gap:6px;-webkit-app-region:no-drag;}
+.win-btn{width:28px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;display:grid;place-items:center;cursor:pointer;transition:all .15s;}
+.win-btn:hover{background:var(--border);}
+.win-btn.close:hover{background:var(--danger);border-color:var(--danger);}
+.win-btn svg{width:12px;height:12px;color:var(--text-muted);}
+
+/* LAYOUT */
+.sidebar{position:fixed;left:0;top:48px;bottom:0;width:200px;border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;z-index:10;background:var(--bg);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:.85rem;color:var(--text-muted);transition:all .15s;}
+.nav-item:hover{background:var(--surface);color:var(--text);}
+.nav-item.active{background:var(--surface2);color:var(--accent);}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;}
+.main{margin-left:200px;padding:36px 40px;position:relative;z-index:1;}
+
+/* STATS */
+.stats{display:flex;gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:36px;}
+.stat{flex:1;background:var(--surface);padding:18px 22px;}
+.stat-value{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:700;color:var(--accent);}
+.stat-label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border:none;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .17s;letter-spacing:.01em;}
+.btn svg{width:15px;height:15px;flex-shrink:0;}
+.btn-primary{background:var(--accent);color:#0f0e0c;}
+.btn-primary:hover{background:#d9b85c;transform:translateY(-1px);box-shadow:0 6px 18px rgba(201,168,76,.25);}
+.btn-outline{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+.btn-outline:hover{border-color:var(--accent-dim);color:var(--text);background:var(--surface);}
+.btn-ghost{background:var(--surface2);color:var(--text-muted);}
+.btn-ghost:hover{background:var(--border);color:var(--text);}
+.btn-danger{background:rgba(192,68,42,.12);color:#d0654a;border:1px solid rgba(192,68,42,.3);}
+.btn-danger:hover{background:rgba(192,68,42,.22);}
+.btn-sm{padding:6px 12px;font-size:.78rem;border-radius:8px;}
+.btn-icon{width:32px;height:32px;padding:0;border-radius:8px;display:grid;place-items:center;}
+.btn-icon svg{width:14px;height:14px;}
+
+/* SECTION */
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.section-title{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:600;}
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;}
+.search-wrap:focus-within{border-color:var(--accent-dim);}
+.search-wrap svg{width:14px;height:14px;color:var(--text-sub);}
+.search-wrap input{background:none;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.83rem;width:180px;}
+.search-wrap input::placeholder{color:var(--text-sub);}
+
+/* BOOK GRID */
+#bookList,#shareList{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;list-style:none;}
+.book-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;animation:fadeUp .35s ease both;}
+.book-card:hover{transform:translateY(-3px);border-color:var(--accent-dim);box-shadow:0 10px 36px rgba(0,0,0,.4);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.book-spine{height:5px;background:linear-gradient(90deg,var(--accent),var(--accent-dim));}
+.book-body{padding:18px;}
+.book-icon-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.book-icon{width:42px;height:52px;border-radius:6px;background:linear-gradient(135deg,var(--surface2),var(--border));display:grid;place-items:center;border:1px solid var(--border);}
+.book-icon svg{width:20px;height:20px;color:var(--accent);}
+.badge{font-size:.65rem;font-weight:500;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.07em;}
+.badge-epub{background:rgba(74,140,92,.15);color:var(--green);border:1px solid rgba(74,140,92,.3);}
+.badge-pdf{background:rgba(192,68,42,.15);color:#d0654a;border:1px solid rgba(192,68,42,.3);}
+.badge-mobi{background:rgba(201,168,76,.15);color:var(--accent);border:1px solid rgba(201,168,76,.3);}
+.badge-azw3{background:rgba(80,120,200,.15);color:#6080c8;border:1px solid rgba(80,120,200,.3);}
+.book-title{font-family:'Playfair Display',serif;font-size:.95rem;font-weight:600;margin-bottom:3px;line-height:1.3;}
+.book-author{font-size:.78rem;color:var(--text-muted);margin-bottom:12px;}
+.book-meta{display:flex;gap:14px;margin-bottom:16px;}
+.book-meta-item{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--text-sub);}
+.book-meta-item svg{width:11px;height:11px;}
+.book-actions{display:flex;align-items:center;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
+.btn-share-card{background:rgba(201,168,76,.1);color:var(--accent);border:1px solid rgba(201,168,76,.25);}
+.btn-share-card:hover{background:rgba(201,168,76,.2);border-color:var(--accent);}
+.ml-auto{margin-left:auto;}
+
+/* SHARE LIST */
+.share-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease both;}
+.share-row:hover{border-color:var(--border);}
+.share-icon-wrap{width:38px;height:38px;border-radius:8px;background:rgba(201,168,76,.1);display:grid;place-items:center;flex-shrink:0;}
+.share-icon-wrap svg{width:18px;height:18px;color:var(--accent);}
+.share-info{flex:1;min-width:0;}
+.share-title{font-size:.88rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.share-meta{font-size:.73rem;color:var(--text-muted);margin-top:2px;}
+.share-badge{font-size:.65rem;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.share-badge.active{background:rgba(74,140,92,.15);color:var(--green);border:1px solid rgba(74,140,92,.3);}
+.share-badge.expired{background:rgba(192,68,42,.15);color:#d0654a;border:1px solid rgba(192,68,42,.3);}
+.share-actions{display:flex;gap:6px;align-items:center;}
+.link-box{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:.73rem;color:var(--text-muted);font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* EMPTY */
+.empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:70px 24px;color:var(--text-muted);text-align:center;}
+.empty-state svg{width:44px;height:44px;color:var(--text-sub);}
+.empty-state h3{font-family:'Playfair Display',serif;font-size:1rem;color:var(--text);}
+.empty-state p{font-size:.84rem;max-width:280px;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:none;place-items:center;}
+.modal-overlay.open{display:grid;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px;width:440px;max-width:92vw;animation:scaleIn .2s ease;}
+@keyframes scaleIn{from{transform:scale(.93);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-title{font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:5px;}
+.modal-sub{font-size:.8rem;color:var(--text-muted);margin-bottom:22px;}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.form-label{font-size:.78rem;color:var(--text-muted);font-weight:500;}
+.form-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.875rem;outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:var(--accent-dim);}
+.form-input::placeholder{color:var(--text-sub);}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;}
+.link-result{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:monospace;font-size:.78rem;color:var(--accent);word-break:break-all;margin-bottom:10px;}
+.copy-hint{font-size:.73rem;color:var(--text-muted);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);color:var(--text);padding:12px 18px;border-radius:var(--radius);font-size:.84rem;z-index:999;transform:translateY(16px);opacity:0;transition:all .22s;pointer-events:none;max-width:280px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.error{border-left-color:var(--danger);}
+
+/* PAGE */
+.page{display:none;}.page.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- TITLEBAR -->
+<div class="titlebar">
+  <div class="titlebar-left">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    </div>
+    <span class="app-title">Wellens</span>
+  </div>
+  <div class="win-controls">
+    <div class="win-btn" onclick="window.wellens.minimize()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <div class="win-btn" onclick="window.wellens.maximize()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+    </div>
+    <div class="win-btn close" onclick="window.wellens.closeWindow()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-item active" onclick="showPage('library',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Library
+  </div>
+  <div class="nav-item" onclick="showPage('shares',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    Shared Links
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LIBRARY PAGE -->
+  <div class="page active" id="page-library">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Books</div></div>
+      <div class="stat"><div class="stat-value" id="stat-pdf">0</div><div class="stat-label">PDFs</div></div>
+      <div class="stat"><div class="stat-value" id="stat-shares">0</div><div class="stat-label">Active Shares</div></div>
+      <div class="stat"><div class="stat-value" id="stat-size">0 MB</div><div class="stat-label">Storage</div></div>
+    </div>
+
+    <div class="section-head">
+      <h2 class="section-title">Your Library</h2>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search…" id="searchInput" oninput="filterBooks()">
+        </div>
+        <button class="btn btn-primary" onclick="uploadBook()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload Book
+        </button>
+      </div>
+    </div>
+
+    <ul id="bookList"></ul>
+  </div>
+
+  <!-- SHARES PAGE -->
+  <div class="page" id="page-shares">
+    <div class="section-head">
+      <h2 class="section-title">Shared Links</h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadShares()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+    <ul id="shareList" style="display:flex;flex-direction:column;gap:10px;list-style:none;"></ul>
+  </div>
+
+</div>
+
+<!-- SHARE MODAL -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <h2 class="modal-title">Share Book</h2>
+    <p class="modal-sub" id="shareModalSub">Set a password and optional expiry date.</p>
+
+    <div id="shareForm">
+      <div class="form-group">
+        <label class="form-label">Password (required)</label>
+        <input class="form-input" type="password" id="sharePassword" placeholder="Enter a strong password…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date & Time (optional)</label>
+        <input class="form-input" type="datetime-local" id="shareExpiry">
+      </div>
+    </div>
+
+    <div id="shareResult" style="display:none">
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px;">Share this link with the recipient. They will need the password you set.</p>
+      <div class="link-result" id="shareLink"></div>
+      <p class="copy-hint">Click the link to copy it to clipboard.</p>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('shareModal')">Close</button>
+      <button class="btn btn-primary" id="shareSubmitBtn" onclick="submitShare()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Create Share Link
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let allBooks = [];
+let shareTargetId = null;
+
+// ── Navigation ──
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'shares') loadShares();
+}
+
+// ── Load books ──
+async function loadBooks() {
+  allBooks = await window.wellens.getBooks();
+  renderBooks(allBooks);
+  updateStats();
+}
+
+function renderBooks(books) {
+  const ul = document.getElementById('bookList');
+  ul.innerHTML = '';
+  if (!books.length) {
+    ul.innerHTML = `<li class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <h3>No books yet</h3>
+      <p>Upload your first book using the button above.</p>
+    </li>`;
+    return;
+  }
+
+  books.forEach((b, i) => {
+    const li = document.createElement('li');
+    li.className = 'book-card';
+    li.style.animationDelay = `${i * 50}ms`;
+    const dateStr = new Date(b.dateAdded).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+    const canRead = b.format === 'pdf';
+    li.innerHTML = `
+      <div class="book-spine"></div>
+      <div class="book-body">
+        <div class="book-icon-row">
+          <div class="book-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+          <span class="badge badge-${b.format}">${b.format.toUpperCase()}</span>
+        </div>
+        <div class="book-title">${esc(b.title)}</div>
+        <div class="book-author">${esc(b.author)}</div>
+        <div class="book-meta">
+          <span class="book-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>${b.size}</span>
+          <span class="book-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${dateStr}</span>
+        </div>
+        <div class="book-actions">
+          ${canRead ? `<button class="btn btn-ghost btn-sm" onclick="readBook('${b.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Read
+          </button>` : `<button class="btn btn-ghost btn-sm" disabled title="Only PDF reading is supported" style="opacity:.4;cursor:not-allowed">Read</button>`}
+          ${canRead ? `<button class="btn btn-icon btn-share-card" title="Share" onclick="openShareModal('${b.id}','${esc(b.title)}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>` : ''}
+          <button class="btn btn-icon btn-danger ml-auto" title="Delete" onclick="deleteBook('${b.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+    ul.appendChild(li);
+  });
+}
+
+function filterBooks() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderBooks(allBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)));
+}
+
+// ── Stats ──
+async function updateStats() {
+  const shares = await window.wellens.getShares();
+  const activeShares = shares.filter(s => !s.expired && !s.isLocal).length;
+  document.getElementById('stat-total').textContent = allBooks.length;
+  document.getElementById('stat-pdf').textContent = allBooks.filter(b => b.format === 'pdf').length;
+  document.getElementById('stat-shares').textContent = activeShares;
+  const totalBytes = allBooks.reduce((s, b) => s + (b.sizeBytes || 0), 0);
+  document.getElementById('stat-size').textContent = formatSize(totalBytes);
+}
+
+// ── Actions ──
+async function uploadBook() {
+  const result = await window.wellens.uploadBook();
+  if (result.success) {
+    showToast(`"${result.book.title}" uploaded!`);
+    await loadBooks();
+  }
+}
+
+async function readBook(id) {
+  const res = await window.wellens.readBook(id);
+  if (!res.success) showToast(res.error || 'Cannot open book', true);
+  else showToast('Opening reader…');
+}
+
+async function deleteBook(id) {
+  const book = allBooks.find(b => b.id === id);
+  if (!confirm(`Delete "${book?.title}"? This cannot be undone.`)) return;
+  await window.wellens.deleteBook(id);
+  showToast('Book deleted');
+  await loadBooks();
+}
+
+// ── Share Modal ──
+function openShareModal(bookId, title) {
+  shareTargetId = bookId;
+  document.getElementById('shareModalSub').textContent = `Sharing: "${title}"`;
+  document.getElementById('shareForm').style.display = '';
+  document.getElementById('shareResult').style.display = 'none';
+  document.getElementById('shareSubmitBtn').style.display = '';
+  document.getElementById('sharePassword').value = '';
+  document.getElementById('shareExpiry').value = '';
+  document.getElementById('shareModal').classList.add('open');
+}
+
+async function submitShare() {
+  const password = document.getElementById('sharePassword').value.trim();
+  const expiryVal = document.getElementById('shareExpiry').value;
+  if (!password) { showToast('Please enter a password', true); return; }
+
+  const expiresAt = expiryVal ? new Date(expiryVal).getTime() : null;
+  const res = await window.wellens.createShare({ bookId: shareTargetId, password, expiresAt });
+
+  if (!res.success) { showToast(res.error || 'Error creating share', true); return; }
+
+  document.getElementById('shareForm').style.display = 'none';
+  document.getElementById('shareSubmitBtn').style.display = 'none';
+  document.getElementById('shareResult').style.display = '';
+  document.getElementById('shareLink').textContent = res.link;
+  document.getElementById('shareLink').onclick = () => {
+    navigator.clipboard.writeText(res.link);
+    showToast('Link copied to clipboard!');
+  };
+  document.getElementById('shareLink').style.cursor = 'pointer';
+
+  await updateStats();
+}
+
+// ── Shares Page ──
+async function loadShares() {
+  const shares = await window.wellens.getShares();
+  const visible = shares.filter(s => !s.isLocal);
+  const ul = document.getElementById('shareList');
+  ul.innerHTML = '';
+
+  if (!visible.length) {
+    ul.innerHTML = `<li class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <h3>No shares yet</h3>
+      <p>Share a PDF from your library to create a secure link.</p>
+    </li>`;
+    return;
+  }
+
+  visible.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'share-row';
+    li.style.animationDelay = `${i * 40}ms`;
+    const created = new Date(s.createdAt).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+    const expiry = s.expiresAt ? new Date(s.expiresAt).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Never';
+    li.innerHTML = `
+      <div class="share-icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="share-info">
+        <div class="share-title">${esc(s.bookTitle)}</div>
+        <div class="share-meta">Created ${created} · Expires: ${expiry} · Opens: ${s.linkOpens}</div>
+      </div>
+      <span class="share-badge ${s.expired ? 'expired' : 'active'}">${s.expired ? 'Expired' : 'Active'}</span>
+      <div class="share-actions">
+        <button class="btn btn-ghost btn-sm btn-icon" title="Delete share" onclick="deleteShare('${s.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>`;
+    ul.appendChild(li);
+  });
+}
+
+async function deleteShare(id) {
+  if (!confirm('Revoke this share link?')) return;
+  await window.wellens.deleteShare(id);
+  showToast('Share revoked');
+  loadShares();
+  updateStats();
+}
+
+// ── Helpers ──
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); })
+);
+
+let toastTimer;
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function formatSize(bytes) {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+// ── Init ──
+loadBooks();
+</script>
+</body>
+</html>
