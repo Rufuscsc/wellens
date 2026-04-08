@@ -21,5 +21,6 @@ contextBridge.exposeInMainWorld('wellens', {
   closeWindow:  ()           => ipcRenderer.send('window:close'),
 
   // Utility
+  getMode:      ()           => ipcRenderer.invoke('app:getMode'),
   getShareId:   ()           => new URLSearchParams(window.location.search).get('shareId'),
 });

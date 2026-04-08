@@ -38,8 +38,9 @@ h1{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;text-al
 .btn-primary:hover{background:#d9b85c;}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
 
-.error-msg{background:rgba(192,68,42,.12);border:1px solid rgba(192,68,42,.3);border-radius:8px;padding:10px 14px;font-size:.8rem;color:#d0654a;margin-bottom:16px;display:none;}
+.error-msg{background:rgba(192,68,42,.12);border:1px solid rgba(192,68,42,.3);border-radius:8px;padding:10px 14px;font-size:.8rem;color:#d0654a;margin-bottom:16px;display:none;text-align:center;line-height:1.5;}
 .error-msg.show{display:block;}
+.error-msg.device-limit{background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.3);color:var(--accent);}
 
 .app-brand{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:24px;}
 .logo-icon{width:24px;height:24px;background:var(--accent);border-radius:5px;display:grid;place-items:center;}
@@ -122,8 +123,11 @@ async function unlock() {
 function showError(msg) {
   const el = document.getElementById('errorMsg');
   el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4000);
+  el.className = 'error-msg show';
+  if (msg.includes('Device limit') || msg.includes('expired on this device')) {
+    el.classList.add('device-limit');
+  }
+  setTimeout(() => el.className = 'error-msg', 6000);
 }
 </script>
 </body>

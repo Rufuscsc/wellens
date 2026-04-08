@@ -243,8 +243,28 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
           </button>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Expiry Date & Time (optional)</label>
+      <div style="display:flex;gap:12px">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Max Devices</label>
+          <input class="form-input" type="number" id="shareMaxDevices" min="1" max="100" value="1" placeholder="1">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Access Duration</label>
+          <select class="form-input" id="shareExpiryDuration">
+            <option value="0">No limit</option>
+            <option value="300000">5 minutes</option>
+            <option value="3600000">1 hour</option>
+            <option value="86400000">1 day</option>
+            <option value="259200000">3 days</option>
+            <option value="604800000" selected>7 days</option>
+            <option value="2592000000">30 days</option>
+            <option value="7776000000">90 days</option>
+            <option value="custom">Custom date…</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="customExpiryGroup" style="display:none">
+        <label class="form-label">Expiry Date & Time</label>
         <input class="form-input" type="datetime-local" id="shareExpiry">
       </div>
     </div>
@@ -391,17 +411,38 @@ function openShareModal(bookId, title) {
   document.getElementById('shareResult').style.display = 'none';
   document.getElementById('shareSubmitBtn').style.display = '';
   document.getElementById('sharePassword').value = '';
+  document.getElementById('shareMaxDevices').value = '1';
+  document.getElementById('shareExpiryDuration').value = '604800000';
   document.getElementById('shareExpiry').value = '';
+  document.getElementById('customExpiryGroup').style.display = 'none';
   document.getElementById('shareModal').classList.add('open');
 }
 
+// Toggle custom expiry date field visibility
+document.getElementById('shareExpiryDuration').addEventListener('change', (e) => {
+  document.getElementById('customExpiryGroup').style.display =
+    e.target.value === 'custom' ? '' : 'none';
+});
+
 async function submitShare() {
   const password = document.getElementById('sharePassword').value.trim();
+  const maxDevices = parseInt(document.getElementById('shareMaxDevices').value) || 1;
+  const durationVal = document.getElementById('shareExpiryDuration').value;
   const expiryVal = document.getElementById('shareExpiry').value;
   if (!password) { showToast('Please enter a password', true); return; }
 
-  const expiresAt = expiryVal ? new Date(expiryVal).getTime() : null;
-  const res = await window.wellens.createShare({ bookId: shareTargetId, password, expiresAt });
+  let expiresAt = null;
+  let expiryDuration = null;
+
+  if (durationVal === 'custom') {
+    // Use absolute expiry date
+    expiresAt = expiryVal ? new Date(expiryVal).getTime() : null;
+  } else if (durationVal !== '0') {
+    // Use relative per-device duration
+    expiryDuration = parseInt(durationVal);
+  }
+
+  const res = await window.wellens.createShare({ bookId: shareTargetId, password, expiresAt, maxDevices, expiryDuration });
 
   if (!res.success) { 
     if (!res.canceled) showToast(res.error || 'Error exporting share', true); 
@@ -457,13 +498,15 @@ async function loadShares() {
     li.style.animationDelay = `${i * 40}ms`;
     const created = new Date(s.createdAt).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
     const expiry = s.expiresAt ? new Date(s.expiresAt).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Never';
+    const durationLabel = s.expiryDuration ? formatDuration(s.expiryDuration) + '/device' : (s.expiresAt ? expiry : 'No limit');
+    const deviceInfo = s.maxDevices < 999 ? `${s.activatedDevices || 0}/${s.maxDevices} devices` : 'Unlimited';
     li.innerHTML = `
       <div class="share-icon-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </div>
       <div class="share-info">
         <div class="share-title">${esc(s.bookTitle)}</div>
-        <div class="share-meta">Created ${created} · Expires: ${expiry} · Opens: ${s.linkOpens}</div>
+        <div class="share-meta">Created ${created} · ${durationLabel} · ${deviceInfo} · Opens: ${s.linkOpens}</div>
       </div>
       <span class="share-badge ${s.expired ? 'expired' : 'active'}">${s.expired ? 'Expired' : 'Active'}</span>
       <div class="share-actions">
@@ -507,8 +550,30 @@ function formatSize(bytes) {
   return (bytes/1048576).toFixed(1) + ' MB';
 }
 
+function formatDuration(ms) {
+  if (!ms) return 'No limit';
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return mins + ' min';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + ' hr' + (hrs > 1 ? 's' : '');
+  const days = Math.round(hrs / 24);
+  return days + ' day' + (days > 1 ? 's' : '');
+}
+
 // ── Init ──
-loadBooks();
+async function initApp() {
+  const isCreator = await window.wellens.getMode();
+  if (!isCreator) {
+    const uploadBtn = document.querySelector('button[onclick="uploadBook()"]');
+    if (uploadBtn) uploadBtn.style.display = 'none';
+    
+    const style = document.createElement('style');
+    style.innerHTML = '.btn-share-card { display: none !important; }';
+    document.head.appendChild(style);
+  }
+  loadBooks();
+}
+initApp();
 </script>
 </body>
 </html>

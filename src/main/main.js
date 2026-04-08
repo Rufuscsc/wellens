@@ -8,8 +8,31 @@ const USER_DATA = app.getPath('userData');
 const BOOKS_DIR = path.join(USER_DATA, 'books');
 const SHARES_DIR= path.join(USER_DATA, 'shares');
 const DB_FILE   = path.join(USER_DATA, 'library.json');
+const DEVICE_ID_FILE = path.join(USER_DATA, 'device-id.json');
 
 [BOOKS_DIR, SHARES_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
+
+// ── Device ID ──────────────────────────────────────────────────────────────
+function getDeviceId() {
+  try {
+    const data = JSON.parse(fs.readFileSync(DEVICE_ID_FILE, 'utf8'));
+    if (data.deviceId) return data.deviceId;
+  } catch {}
+  const deviceId = crypto.randomUUID();
+  fs.writeFileSync(DEVICE_ID_FILE, JSON.stringify({ deviceId, createdAt: Date.now() }));
+  return deviceId;
+}
+const DEVICE_ID = getDeviceId();
+
+// ── App Mode (Creator vs Viewer) ──────────────────────────────────────────
+// If the .creator file is present, the app shows Upload & Share buttons.
+const IS_CREATOR = fs.existsSync(path.join(app.getAppPath(), '.creator')) || 
+                   fs.existsSync(path.join(process.cwd(), '.creator'));
+
+// ── Backend API ────────────────────────────────────────────────────────────
+// Used for global device limit tracking across offline files.
+// When you deploy your backend/server.js, put the URL here.
+const API_URL = 'http://localhost:3000';
 
 // ── DB ─────────────────────────────────────────────────────────────────────
 function readDB() {
@@ -53,6 +76,8 @@ function encryptBufferWithKey(buf, keyBytes) {
 const sessionMap = {};
 // shareId -> encKey  (set when reader opens, cleared when reader closes)
 const activeReaderSessions = {};
+// shareId -> source .wellens file path (for writing activations back)
+const shareSourceFiles = {};
 
 // ── Windows ────────────────────────────────────────────────────────────────
 let mainWindow = null;
@@ -210,6 +235,8 @@ app.on('activate', () => {
 
 // ── IPC: Library ───────────────────────────────────────────────────────────
 
+ipcMain.handle('app:getMode', () => IS_CREATOR);
+
 ipcMain.handle('library:upload', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select a Book',
@@ -298,7 +325,7 @@ ipcMain.handle('library:readBook', async (e, bookId) => {
 
 // ── IPC: Sharing ───────────────────────────────────────────────────────────
 
-ipcMain.handle('share:create', async (e, { bookId, password, expiresAt }) => {
+ipcMain.handle('share:create', async (e, { bookId, password, expiresAt, maxDevices, expiryDuration }) => {
   const db   = readDB();
   const book = db.books.find(b => b.id === bookId);
   if (!book) return { success: false, error: 'Book not found' };
@@ -323,6 +350,9 @@ ipcMain.handle('share:create', async (e, { bookId, password, expiresAt }) => {
     encKeyEnc,
     passwordHash,
     expiresAt: expiresAt || null,
+    maxDevices: maxDevices || 1,
+    expiryDuration: expiryDuration || null,  // ms from first open per device
+    activations: [],  // { deviceId, activatedAt }
     isLocal: false,
     createdAt: Date.now(),
     linkOpens: 0,
@@ -332,11 +362,15 @@ ipcMain.handle('share:create', async (e, { bookId, password, expiresAt }) => {
 
   const exportData = JSON.stringify({
     magic: "WELLENS_SECURE_SHARE",
-    version: 1,
+    version: 2,
     metadata: {
       id: share.id, bookId: share.bookId, bookTitle: share.bookTitle,
-      encKeyEnc: share.encKeyEnc, passwordHash: share.passwordHash, expiresAt: share.expiresAt
+      encKeyEnc: share.encKeyEnc, passwordHash: share.passwordHash,
+      expiresAt: share.expiresAt,
+      maxDevices: share.maxDevices,
+      expiryDuration: share.expiryDuration,
     },
+    activations: [],
     payload: encBuf.toString('base64')
   });
 
@@ -348,6 +382,8 @@ ipcMain.handle('share:create', async (e, { bookId, password, expiresAt }) => {
 
   if (!savePath.canceled && savePath.filePath) {
     fs.writeFileSync(savePath.filePath, exportData, 'utf8');
+    // Remember the source file path for activation write-back
+    shareSourceFiles[shareId] = savePath.filePath;
   }
 
   const link = `https://Rufuscsc.github.io/wellens/share.html`;
@@ -371,6 +407,7 @@ async function processImportedFile(filePath) {
     const parsed = JSON.parse(content);
     if (parsed.magic !== 'WELLENS_SECURE_SHARE') throw new Error('Invalid signature');
     
+    const isV2 = parsed.version >= 2;
     const db = readDB();
     const existing = db.shares.find(s => s.id === parsed.metadata.id);
     if (!existing) {
@@ -378,10 +415,30 @@ async function processImportedFile(filePath) {
         id: parsed.metadata.id, bookId: parsed.metadata.bookId,
         bookTitle: parsed.metadata.bookTitle, encKeyEnc: parsed.metadata.encKeyEnc,
         passwordHash: parsed.metadata.passwordHash, expiresAt: parsed.metadata.expiresAt,
+        maxDevices: isV2 ? (parsed.metadata.maxDevices || 1) : 999,
+        expiryDuration: isV2 ? (parsed.metadata.expiryDuration || null) : null,
+        activations: isV2 ? (parsed.activations || []) : [],
         isLocal: false, createdAt: Date.now(), linkOpens: 0
       });
       writeDB(db);
+    } else {
+      // Merge activations from file (file may have newer activations from other devices)
+      if (isV2 && parsed.activations && parsed.activations.length) {
+        const existingIds = new Set((existing.activations || []).map(a => a.deviceId));
+        for (const act of parsed.activations) {
+          if (!existingIds.has(act.deviceId)) {
+            existing.activations = existing.activations || [];
+            existing.activations.push(act);
+          }
+        }
+        existing.maxDevices = parsed.metadata.maxDevices || existing.maxDevices || 999;
+        existing.expiryDuration = parsed.metadata.expiryDuration || existing.expiryDuration || null;
+        writeDB(db);
+      }
     }
+    
+    // Remember the source file path for activation write-back
+    shareSourceFiles[parsed.metadata.id] = filePath;
     
     // Extract base64 payload back into native physical .enc file
     const encPath = path.join(SHARES_DIR, parsed.metadata.id + '.enc');
@@ -399,15 +456,28 @@ async function processImportedFile(filePath) {
 
 ipcMain.handle('share:getAll', async () => {
   const db = readDB();
-  return db.shares.map(s => ({
-    id: s.id,
-    bookTitle: s.bookTitle,
-    expiresAt: s.expiresAt,
-    createdAt: s.createdAt,
-    linkOpens: s.linkOpens || 0,
-    isLocal: s.isLocal,
-    expired: s.expiresAt ? Date.now() > s.expiresAt : false,
-  }));
+  return db.shares.map(s => {
+    const activations = s.activations || [];
+    const maxDevices = s.maxDevices || 999;
+    // Check if this device has an activation and compute its per-device expiry
+    const myActivation = activations.find(a => a.deviceId === DEVICE_ID);
+    let deviceExpired = false;
+    if (myActivation && s.expiryDuration) {
+      deviceExpired = Date.now() > (myActivation.activatedAt + s.expiryDuration);
+    }
+    return {
+      id: s.id,
+      bookTitle: s.bookTitle,
+      expiresAt: s.expiresAt,
+      expiryDuration: s.expiryDuration || null,
+      createdAt: s.createdAt,
+      linkOpens: s.linkOpens || 0,
+      isLocal: s.isLocal,
+      maxDevices,
+      activatedDevices: activations.length,
+      expired: deviceExpired || (s.expiresAt ? Date.now() > s.expiresAt : false),
+    };
+  });
 });
 
 ipcMain.handle('share:delete', async (e, shareId) => {
@@ -424,9 +494,55 @@ ipcMain.handle('share:unlock', async (e, { shareId, password }) => {
   const share = db.shares.find(s => s.id === shareId);
   if (!share) return { success: false, error: 'Share not found.' };
 
-  // Expiry check
+  // Absolute expiry check
   if (share.expiresAt && Date.now() > share.expiresAt)
     return { success: false, error: 'This share link has expired.' };
+
+  // ── Device activation check ──
+  const maxDevices  = share.maxDevices || 999;
+  let activations = share.activations || [];
+  let myActivation = activations.find(a => a.deviceId === DEVICE_ID);
+
+  if (API_URL) {
+    try {
+      const resp = await fetch(`${API_URL}/api/activations/${shareId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: DEVICE_ID, maxDevices })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        return { success: false, error: data.error || 'Server error tracking device.' };
+      }
+      activations = data.activations;
+      myActivation = activations.find(a => a.deviceId === DEVICE_ID);
+      share.activations = activations;
+      writeDB(db);
+    } catch (err) {
+      return { success: false, error: 'Internet connection required to verify device sync.' };
+    }
+  } else {
+    if (!myActivation && activations.length >= maxDevices) {
+      return {
+        success: false,
+        error: `Device limit reached — this file can only be opened on ${maxDevices} device${maxDevices > 1 ? 's' : ''}.`
+      };
+    }
+    if (!myActivation) {
+      myActivation = { deviceId: DEVICE_ID, activatedAt: Date.now() };
+      share.activations = share.activations || [];
+      share.activations.push(myActivation);
+      writeDB(db);
+      writeActivationToSourceFile(shareId, share.activations);
+    }
+  }
+
+  // Per-device expiry check
+  if (myActivation && share.expiryDuration) {
+    const deviceExpiresAt = myActivation.activatedAt + share.expiryDuration;
+    if (Date.now() > deviceExpiresAt)
+      return { success: false, error: 'Your access has expired on this device.' };
+  }
 
   // Password check
   const hash = hashPassword(password);
@@ -442,20 +558,33 @@ ipcMain.handle('share:unlock', async (e, { shareId, password }) => {
     return { success: false, error: 'Decryption error.' };
   }
 
+  // Calculate per-device expiresAt
+  const act = myActivation;
+  let effectiveExpiresAt = share.expiresAt || null;
+  if (share.expiryDuration && act) {
+    const deviceExpiresAt = act.activatedAt + share.expiryDuration;
+    // Use the earlier of absolute and per-device expiry
+    if (effectiveExpiresAt) {
+      effectiveExpiresAt = Math.min(effectiveExpiresAt, deviceExpiresAt);
+    } else {
+      effectiveExpiresAt = deviceExpiresAt;
+    }
+  }
+
   // Create session
   const token = crypto.randomBytes(32).toString('hex');
   sessionMap[token] = {
     shareId,
     encKey,
     bookTitle: share.bookTitle,
-    expiresAt: share.expiresAt,  // ← carry the expiry through
+    expiresAt: effectiveExpiresAt,
   };
 
   // Increment open count
   share.linkOpens = (share.linkOpens || 0) + 1;
   writeDB(db);
 
-  return { success: true, sessionToken: token, expiresAt: share.expiresAt };
+  return { success: true, sessionToken: token, expiresAt: effectiveExpiresAt };
 });
 
 // Open reader from a valid session token
@@ -538,4 +667,18 @@ function formatSize(b) {
   if (b < 1024)        return b + ' B';
   if (b < 1048576)     return (b / 1024).toFixed(1) + ' KB';
   return (b / 1048576).toFixed(1) + ' MB';
+}
+
+// Write device activations back into the source .wellens file
+function writeActivationToSourceFile(shareId, activations) {
+  const filePath = shareSourceFiles[shareId];
+  if (!filePath) return;
+  try {
+    if (!fs.existsSync(filePath)) return;
+    const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (content.magic !== 'WELLENS_SECURE_SHARE') return;
+    content.activations = activations;
+    content.version = Math.max(content.version || 1, 2);
+    fs.writeFileSync(filePath, JSON.stringify(content), 'utf8');
+  } catch {}
 }
