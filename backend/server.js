@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const DB_FILE = path.join(__dirname, 'store.json');
+const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'store.json');
 
 function readDB() {
   if (!fs.existsSync(DB_FILE)) return {};
